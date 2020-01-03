@@ -100,6 +100,7 @@ function netr.set_colour(tile_id, input_colour, save)
     local colour = netr.table_to_Color32(input_colour)
     netr.log.f("death is coming " .. tostring(colour), netr.log.set_colour)
     local current_colour = netr.get_colour(tile_id)
+    colour.a = current_colour.a
     netr.log.f("current_colour " .. tostring(current_colour), netr.log.set_colour)
     -- if netr.original_colour[tile_id] == nil then
         -- netr.original_colour[tile_id] = current_colour
@@ -246,7 +247,7 @@ end
 function netr_main()
     log('loadind netr into the world')
     netr.placement_mod = true
-    netr.map_mode = 'debug_1'
+    netr.map_mode = 'normal'
     netr.last_colour = 0
     netr.tick = 0
     -- netr.original_colour = {}
