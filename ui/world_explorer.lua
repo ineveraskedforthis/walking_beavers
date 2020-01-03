@@ -24,7 +24,7 @@ netr.new_colour = new_colour
 local function add_band(tile)
     netr.log.f("creating new band", netr.log.add_band)
     local colour = netr.new_colour()
-    netr.log.f("color is ready", netr.log.add_band)
+    netr.log.f("colour is ready", netr.log.add_band)
     netr.band_count = netr.band_count + 1
     netr.log.f("id updated", netr.log.add_band)
     netr.bands[netr.band_count] = netr.Band:new(netr.band_count, tile, colour)
@@ -40,7 +40,12 @@ end
 netr.log.f = n_log
 
 local function table_to_Color32(t) 
-    return Color32(t[1], t[2], t[3], t[4])
+    if type(t) == 'table' then
+        return Color32(t[1], t[2], t[3], t[4])
+    elseif t == nil then
+        return Color32(0, 0, 0, 0)
+    end
+    return t 
 end
 netr.table_to_Color32 = table_to_Color32
 
@@ -84,6 +89,17 @@ local function table_to_string(o)
 end
 not_netr.table_to_string = table_to_string
 
+local function get_colour(tile)
+    if netr.map_mode == 'normal' then
+        return world.tileColor[tile] 
+    elseif netr.map_mode == 'debug_1' then
+        return world.tileDemianDebugColor[tile]
+    elseif netr.map_mode == 'debug_2' then
+        return world.tileCalaDebugColor[tile]
+    end
+end
+netr.get_colour = get_colour
+
 local function set_colour(tile_id, input_colour, save)
     if not netr.flags.draw then
         return
@@ -91,12 +107,21 @@ local function set_colour(tile_id, input_colour, save)
     netr.log.f("planting the seed of colourful heaven", netr.log.set_colour)
     local colour = netr.table_to_Color32(input_colour)
     netr.log.f("death is coming " .. tostring(colour), netr.log.set_colour)
-    if netr.map_mode == 'normal' then
-        world.tileColor[tile_id] = colour 
-    elseif netr.map_mode == 'debug_1' then
-        world.tileDemianDebugColor[tile_id] = colour
-    elseif netr.map_mode == 'debug_2' then
-        world.tileCalaDebugColor[tile_id] = colour
+    local current_colour = netr.get_colour(tile_id)
+    netr.log.f("current_colour " .. tostring(current_colour), netr.log.set_colour)
+    if netr.original_colour[tile_id] == nil then
+        netr.original_colour[tile_id] = current_colour
+    end
+    netr.log.f("aroma of rotten meat is carefully preserved ", netr.log.set_colour)
+    if current_colour ~= colour then
+        netr.flags.colour_changed = true
+        if netr.map_mode == 'normal' then
+            world.tileColor[tile_id] = colour 
+        elseif netr.map_mode == 'debug_1' then
+            world.tileDemianDebugColor[tile_id] = colour
+        elseif netr.map_mode == 'debug_2' then
+            world.tileCalaDebugColor[tile_id] = colour
+        end
     end
     netr.log.f("waiting for harvest", netr.log.set_colour)
     netr.save_colours(save)
@@ -105,6 +130,7 @@ netr.set_colour = set_colour
 
 local function save_colours(save)
     if save then
+        -- world.ApplyColorModifications()
         if netr.map_mode == 'normal' then
             world.ApplyColors(world.tileColorTextures)
         elseif netr.map_mode == 'debug_1' then
@@ -127,11 +153,19 @@ netr.update = update
 
 local function draw()
     netr.log.f("draw", netr.log.draw)
+    netr.log.f("restoring colours", netr.log.draw)
+    for tile, flag in pairs(netr.restore_colour) do
+        netr.set_colour(tile, netr.original_colour[tile], false)
+        netr.original_colour[tile] = nil
+        netr.restore_colour[tile] = nil
+    end
+    netr.log.f("colours restored", netr.log.draw)
     for i = 1, netr.band_count do
         netr.log.f("draw i " .. tostring(i), netr.log.draw)
         netr.bands[i]:draw(false)
     end
-    netr.save_colours(netr.color_changed)
+    netr.save_colours(netr.flags.colour_changed)
+    netr.flags.colour_changed = false
     netr.log.f("finish draw", netr.log.draw)
 end
 netr.draw = draw
@@ -207,7 +241,7 @@ end
 
 function netr.Band:move(tile)
     netr.log.f("band move from " .. tostring(self.tile) .. " to " .. tostring(tile), netr.log.band.move)
-    netr.restore_color[tile] = true
+    netr.restore_colour[tile] = true
     self.tile = tile
     netr.log.f("band move finished", netr.log.band.move)
 end
@@ -222,16 +256,15 @@ function netr_main()
     netr.map_mode = 'debug_1'
     netr.last_colour = 0
     netr.tick = 0
-    netr.color_changed = false
-    netr.old_color = {}
-    netr.restore_color = {}
+    netr.original_colour = {}
+    netr.restore_colour = {}
     
     netr.log.hsv_to_rgb = false
     netr.log.add_colour = false
-    netr.log.set_colour = false
+    netr.log.set_colour = true
     netr.log.update = false
     netr.log.add_band = true
-    netr.log.draw = false
+    netr.log.draw = true
     netr.log.band = {}
     netr.log.band.migration = false
     netr.log.band.init = false
@@ -240,6 +273,7 @@ function netr_main()
     netr.flags = {}
     netr.flags.draw = true
     netr.flags.interface = true
+    netr.flags.colour_changed = false
     ticker = Spawn(lgo.ticker)
     
     netr.bands = {}
